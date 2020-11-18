@@ -1,6 +1,8 @@
 #pragma once
 
 #include "csv.h"
+#include "logger.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,6 +12,7 @@ static int get_lines_count(const char* filename)
 	FILE* file;
 	if (fopen_s(&file, filename, "r"))
 	{
+		log("Failed to open file: %s", filename);
 		return -1;
 	}
 
@@ -91,6 +94,7 @@ int read_csv(const char* filename, int* outDataSize, ADCEntry** outData)
 	int lines_count = get_lines_count(filename);
 	if (lines_count < 0)
 	{
+		log("Failed to count lines in file: %s", filename);
 		return FAIL;
 	}
 	int dataSize = lines_count - 1;   // first line contains column names
@@ -99,6 +103,7 @@ int read_csv(const char* filename, int* outDataSize, ADCEntry** outData)
 	FILE* file;
 	if (fopen_s(&file, filename, "r"))
 	{
+		log("Failed to open file: %s", filename);
 		return FAIL;
 	}
 
@@ -121,6 +126,7 @@ int write_csv(const char* filename, int dataSize, ADCEntry* data)
 	FILE* file;
 	if (fopen_s(&file, filename, "w"))
 	{
+		log("Failed to open file: %s", filename);
 		return FAIL;
 	}
 
