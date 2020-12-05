@@ -44,5 +44,11 @@
     <ClCompile Include="settings.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="butter.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="adjust.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

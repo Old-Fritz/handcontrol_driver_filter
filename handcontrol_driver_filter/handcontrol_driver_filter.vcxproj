@@ -139,6 +139,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="adjust.c" />
+    <ClCompile Include="butter.c" />
     <ClCompile Include="csv.c" />
     <ClCompile Include="kalman.c" />
     <ClCompile Include="lowpass.c" />

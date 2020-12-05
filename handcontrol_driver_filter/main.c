@@ -6,7 +6,7 @@
 #include "settings.h"
 
 #include <stdlib.h>
-
+#include <string.h>
 
 int main(int argc, char* argv[])
 {
@@ -41,45 +41,63 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	// init filtered data
-	ADCEntry* data_kalman = malloc(sizeof(ADCEntry) * dataSize);
-	ADCEntry* data_low_pass = malloc(sizeof(ADCEntry) * dataSize);
-
-	data_kalman[0] = data_low_pass[0] = data[0]; // init first element
+	const char* filters_output_names[FILTERS_COUNT];
+	float(*filter_funcs[FILTERS_COUNT])(float) = {kalman_filter, lowpass_filter, butter_filter};
 
 	// get filter params
 	float kalman_init_covariance, kalman_measurement_noise, kalman_environment_noise;
-	const char* kalman_output_filename;
-	settings_get_kalman_params(&kalman_init_covariance, &kalman_measurement_noise, &kalman_environment_noise, &kalman_output_filename);
+	settings_get_kalman_params(&kalman_init_covariance, &kalman_measurement_noise, &kalman_environment_noise, &filters_output_names[0]);
 	float lowpass_cut_off_frequency, lowpass_delta_time;
-	const char* lowpass_output_filename;
-	settings_get_lowpass_params(&lowpass_cut_off_frequency, &lowpass_delta_time, &lowpass_output_filename);
+	settings_get_lowpass_params(&lowpass_cut_off_frequency, &lowpass_delta_time, &filters_output_names[1]);
+	float butter_order, butter_cut_off_frequency, butter_sample_rate;
+	settings_get_butter_params(&butter_order, &butter_cut_off_frequency, &butter_sample_rate, &filters_output_names[2]);
+	float adjust_min_lerp_diff, adjust_max_lerp_diff, adjust_min_speed, adjust_max_speed;
+	settings_get_adjust_params(&adjust_min_lerp_diff, &adjust_max_lerp_diff, &adjust_min_speed, &adjust_max_speed);
+
 
 	// init filters
-	kalman_init(data_kalman[0].value, kalman_init_covariance, kalman_measurement_noise, kalman_environment_noise);
-	lowpass_init(data_low_pass[0].value, lowpass_cut_off_frequency, lowpass_delta_time);
+	kalman_init(data[0].value, kalman_init_covariance, kalman_measurement_noise, kalman_environment_noise);
+	lowpass_init(data[0].value, lowpass_cut_off_frequency, lowpass_delta_time);
+	butter_init(data[0].value, butter_order, butter_cut_off_frequency, butter_sample_rate);//6, 100, 1000);
+	adjust_init(butter_filter, adjust_min_lerp_diff, adjust_max_lerp_diff, adjust_min_speed, adjust_max_speed);//30, 100, 0.02f, 0.2f);
 
-	// perform filtrarion
-	for (int i = 1; i < dataSize; i++)
+	// pass all filtres
+	for (int i = 0; i < FILTERS_COUNT; i++)
 	{
-		data_kalman[i].tick = data_low_pass[i].tick = data[i].tick;
+		ADCEntry* data_filtered = malloc(sizeof(ADCEntry) * dataSize);
+		ADCEntry* data_diffs = malloc(sizeof(ADCEntry) * dataSize);
+		
+		// select next filter
+		adjust_update_func(filter_funcs[i]);
 
-		data_kalman[i].value = kalman_filter(data[i].value);
-		data_low_pass[i].value = lowpass_filter(data[i].value);
+		// perform filtrarion
+		for (int j = 0; j < dataSize; j++)
+		{
+			data_filtered[j].tick = data_diffs[j].tick = data[j].tick;
+			data_filtered[j].value = adjust_filter(data[j].value);
+			data_diffs[j].value = data_filtered[j].value - data[j].value;
+		}
+
+		char filename[512];
+
+		// save filtered data
+		strcpy_s(filename, 512, filters_output_names[i]);
+		strcat_s(filename, 512, ".csv");
+		if (write_csv(filename, dataSize, data_filtered) == FAIL)
+		{
+			log("Failed to save in file: %s", filename);
+		}
+		// save differences data
+		strcpy_s(filename, 512, filters_output_names[i]);
+		strcat_s(filename, 512, "_diffs.csv");
+		if (write_csv(filename, dataSize, data_diffs) == FAIL)
+		{
+			log("Failed to save in file: %s", filename);
+		}
+
+		free(data_filtered);
+		free(data_diffs);
 	}
 	
-	// save data
-	if (write_csv(kalman_output_filename, dataSize, data_kalman) == FAIL)
-	{
-		log("Failed to save in file: %s", kalman_output_filename);
-	}
-	if(write_csv(lowpass_output_filename, dataSize, data_low_pass) == FAIL)
-	{
-		log("Failed to save in file: %s", lowpass_output_filename);
-	}
-
-	// free resources
-	free(data_kalman);
-	free(data_low_pass);
 	free(data);
 }
