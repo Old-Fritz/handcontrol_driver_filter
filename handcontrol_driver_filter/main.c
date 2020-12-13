@@ -8,6 +8,63 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define TEST_DATA_SIZE 2000
+#define TEST_OFFSET 100
+
+void add_sin(ADCEntry* data, int data_size, int period, float amplitude, float offset_amplitude)
+{
+	for (int i = 0; i < data_size; i++)
+	{
+		data[i].value += sin((float)i / (float)period) * amplitude + offset_amplitude;
+	}
+}
+
+void add_mush(ADCEntry* data, int data_size, float min_value, float max_value)
+{
+	for (int i = 0; i < data_size; i++)
+	{
+		data[i].value += ((rand() / (float)RAND_MAX) * (max_value - min_value) + min_value);
+	}
+}
+
+void gen_test_data()
+{
+	const int test_data_size = TEST_DATA_SIZE;
+	ADCEntry data[TEST_DATA_SIZE];
+	ADCEntry mushed_data[TEST_DATA_SIZE];
+	ADCEntry filtred_data[TEST_DATA_SIZE];
+	ADCEntry filtred_data_diffs[TEST_DATA_SIZE];
+
+	// gen data
+	for (int i = 0; i < test_data_size; i++)
+	{
+		data[i].tick = i;
+		data[i].value = 0;
+		mushed_data[i].tick = i;
+		mushed_data[i].value = 0;
+	}
+
+	add_sin(data, test_data_size, 100, 500, 500);
+	add_sin(data, test_data_size, 5, 20, 0);
+	add_sin(mushed_data, test_data_size, 100, 500, 500);
+	add_sin(mushed_data, test_data_size, 5, 20, 0);
+	add_mush(mushed_data, test_data_size, -10, 10);
+
+	// filter data
+	adjust_update_func(butter_filter);
+	for (int i = 0; i < test_data_size; i++)
+	{
+		filtred_data[i].tick = filtred_data_diffs[i].tick = mushed_data[i].tick;
+		filtred_data[i].value = adjust_filter(mushed_data[i].value);
+		filtred_data_diffs[i].value = filtred_data[i].value - data[i].value;
+	}
+
+	write_csv("../csv/test_data_filtered_diffs.csv", test_data_size - TEST_OFFSET, filtred_data_diffs + TEST_OFFSET);
+	write_csv("../csv/test_data_filtered.csv", test_data_size - TEST_OFFSET, filtred_data + TEST_OFFSET);
+	write_csv("../csv/test_data.csv", test_data_size - TEST_OFFSET, data + TEST_OFFSET);
+	write_csv("../csv/test_data_mushed.csv", test_data_size - TEST_OFFSET, mushed_data + TEST_OFFSET);
+}
+
 int main(int argc, char* argv[])
 {
 	int dataSize;
@@ -100,4 +157,6 @@ int main(int argc, char* argv[])
 	}
 	
 	free(data);
+
+	gen_test_data();
 }
